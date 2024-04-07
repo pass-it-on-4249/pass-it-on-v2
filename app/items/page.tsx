@@ -13,6 +13,8 @@ import 'react-toastify/dist/ReactToastify.css';
 import SearchNavMainCategory from "@/components/searchNavMainCategory";
 import productData from "@/public/script/scraped_data.json";
 import SearchNavSubCategory from "@/components/searchNavSubCategory";
+import * as Logging from "@/public/logging/logging";
+
 
 const staggeredWidths = ['240px', '230px', '250px'];
 
@@ -31,6 +33,7 @@ export default function ItemList() {
     } else {
         console.log("log " + customName);
     }
+    Logging.default(event, customName, customInfo);
   }
 
   // If there is no results from search

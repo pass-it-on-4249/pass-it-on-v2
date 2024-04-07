@@ -47,9 +47,12 @@ function hookEventsToLog() {
   // Set up low-level event capturing.  This intercepts all
   // native events before they bubble, so we log the state
   // *before* normal event processing.
-  for (var event_type in EVENT_TYPES_TO_LOG) {
-    document.addEventListener(event_type, logEvent, true);
+  if (typeof window !== 'undefined') {
+    for (var event_type in EVENT_TYPES_TO_LOG) {
+      document.addEventListener(event_type, logEvent, true);
+    }
   }
+  
 }
 
 // Returns a CSS selector that is descriptive of
@@ -95,29 +98,63 @@ function findFirstString(str, choices) {
   return '?';
 }
 
-function test() {
-  console.log("test log");
-}
-
 // Generates or remembers a somewhat-unique ID with distilled user-agent info.
 function getUniqueId() {
-  if (!('uid' in localStorage)) {
-    var browser = findFirstString(navigator.userAgent, [
-      'Seamonkey', 'Firefox', 'Chromium', 'Chrome', 'Safari', 'OPR', 'Opera',
-      'Edge', 'MSIE', 'Blink', 'Webkit', 'Gecko', 'Trident', 'Mozilla']);
-    var os = findFirstString(navigator.userAgent, [
-      'Android', 'iOS', 'Symbian', 'Blackberry', 'Windows Phone', 'Windows',
-      'OS X', 'Linux', 'iOS', 'CrOS']).replace(/ /g, '_');
-    var unique = ('' + Math.random()).substr(2);
-    localStorage['uid'] = os + '-' + browser + '-' + unique;
+  if (typeof window !== 'undefined') {
+    console.log('you are on the browser');
+    if (!('uid' in localStorage)) {
+      var browser = findFirstString(navigator.userAgent, [
+        'Seamonkey', 'Firefox', 'Chromium', 'Chrome', 'Safari', 'OPR', 'Opera',
+        'Edge', 'MSIE', 'Blink', 'Webkit', 'Gecko', 'Trident', 'Mozilla']);
+      var os = findFirstString(navigator.userAgent, [
+        'Android', 'iOS', 'Symbian', 'Blackberry', 'Windows Phone', 'Windows',
+        'OS X', 'Linux', 'iOS', 'CrOS']).replace(/ /g, '_');
+      var unique = ('' + Math.random()).substr(2);
+      localStorage['uid'] = os + '-' + browser + '-' + unique;
+    }
+    return localStorage['uid'];
+  } else {
+    console.log('you are on the server');
+    return "";
   }
-  return localStorage['uid'];
+  
 }
 
+// User Id as keyed in by user
+function setUserid(input) {
+  if (typeof window !== 'undefined') {
+    console.log('you are on the browser');
+    localStorage['userId'] = input;
+    console.log("userId in local storage " + localStorage['userId']);
+  } else {
+    console.log('you are on the server');
+  }
+}
+
+function getUserId() {
+  if (typeof window !== 'undefined') {
+    console.log('you are on the browser');
+    if (('userId' in localStorage)) {
+      console.log("userId in local storage " + localStorage['userId']);
+      return localStorage['userId'];
+    } else {
+      return "";
+    }
+  } else {
+    console.log('you are on the server');
+  }
+}
+
+
 // Log the given event.
-function logEvent(event, customName, customInfo) {
+function logEvent(event, customName, customInfo, isSettingUserId = false, userIdInput = "") {
 	
-	console.log('event', event, 'customName', customName, 'customInfo', customInfo);
+	console.log('event', event, 'customName', customName, 'customInfo', customInfo, 'isSettingUserId', isSettingUserId, 'userIdInput', userIdInput);
+
+  if (isSettingUserId) {
+    console.log("isSettingUserId")
+    setUserid(userIdInput);
+  }
 	
   var time = (new Date).getTime();
   var eventName = customName || event.type;
@@ -134,15 +171,21 @@ function logEvent(event, customName, customInfo) {
     infoObj = Object.assign(infoObj, customInfo);
   }
   var info = JSON.stringify(infoObj);
-  var target = document;
-  if (event) {target = elementDesc(event.target);}
+  var target;
+  if (typeof window !== 'undefined') {
+    target = document;
+    if (event) {target = elementDesc(event.target);}
+  } else {
+    target = "";
+  }
+  
   var state = location.hash;
 
   if (ENABLE_CONSOLE_LOGGING) {
-    console.log(uid, time, eventName, target, info, state, LOG_VERSION);
+    console.log(uid, time, getUserId(), eventName, target, info, state, LOG_VERSION);
   }
   if (ENABLE_NETWORK_LOGGING) {
-    sendNetworkLog(uid, time, eventName, target, info, state, LOG_VERSION);
+    sendNetworkLog(uid, time, getUserId(), eventName, target, info, state, LOG_VERSION);
   }
 }
 
@@ -183,21 +226,23 @@ return {
 //
 /////////////////////////////////////////////////////////////////////////////
 
-// Logging submission function
+// Logging v1 submission function
 // submits to the google form at this URL:
-// docs.google.com/forms/d/e/1FAIpQLSc5u3mqQiuZ3ul5r50OnKW-qihPbSPdRcB0p3zQjcVaOUA3ww/viewform?usp=sf_link
+// docs.google.com/forms/d/e/1FAIpQLSeVPQRcJ-QTRUg6iVzxVv-MSpezkJ-lfdEt4sdmDsVzCGG3lg/viewform?usp=sf_link
 function sendNetworkLog(
   uid,
-  time,
+  timeMs,
+  userid,
   eventname,
   target,
   info,
   state,
   log_version) {
-var formid = "e/1FAIpQLSc5u3mqQiuZ3ul5r50OnKW-qihPbSPdRcB0p3zQjcVaOUA3ww";
+var formid = "e/1FAIpQLSeVPQRcJ-QTRUg6iVzxVv-MSpezkJ-lfdEt4sdmDsVzCGG3lg";
 var data = {
   "entry.1613142373": uid,
-  "entry.1589787878": time,
+  "entry.1589787878": timeMs,
+  "entry.855609023": userid,
   "entry.936741081": eventname,
   "entry.404530990": target,
   "entry.1907841667": info,
@@ -205,7 +250,7 @@ var data = {
   "entry.359647375": log_version
 };
 var params = [];
-for (let key in data) {
+for (var key in data) {
   params.push(key + "=" + encodeURIComponent(data[key]));
 }
 // Submit the form using an image to avoid CORS warnings; warning may still happen, but log will be sent. Go check result in Google Form
@@ -213,6 +258,6 @@ for (let key in data) {
    "/formResponse?" + params.join("&");
 }
 
-module.exports = loggingjs.logEvent;
+export default loggingjs.logEvent;
 
 
